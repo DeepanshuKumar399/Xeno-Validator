@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Xeno · Transaction Validator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+:root{
+  --bg:#070910;--s1:#0e1118;--s2:#141720;--s3:#1c2030;
+  --border:#1f2535;--accent:#6f4ef2;--a2:#9d7dfa;--a3:#c4b5fd;
+  --green:#10d9a0;--red:#ff4d6d;--yellow:#fbbf24;--blue:#38bdf8;
+  --text:#f1f5f9;--muted:#64748b;--r:12px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* grid bg */
+body::before{content:'';position:fixed;inset:0;
+  background-image:linear-gradient(var(--s2) 1px,transparent 1px),linear-gradient(90deg,var(--s2) 1px,transparent 1px);
+  background-size:40px 40px;opacity:.4;pointer-events:none;z-index:0}
+
+/* glow orbs */
+.orb{position:fixed;border-radius:50%;filter:blur(120px);pointer-events:none;z-index:0;opacity:.18}
+.orb1{width:500px;height:500px;background:var(--accent);top:-100px;left:-100px}
+.orb2{width:400px;height:400px;background:#0ea5e9;bottom:-80px;right:-80px}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:200;height:60px;
+  background:rgba(7,9,16,.8);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;padding:0 32px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,var(--accent),#a855f7);
+  display:grid;place-items:center;font-weight:900;font-size:.9rem;color:#fff;
+  box-shadow:0 0 16px rgba(111,78,242,.5)}
+.brand-name{font-weight:800;font-size:.95rem;letter-spacing:-.3px}
+.brand-name em{color:var(--a2);font-style:normal}
+.nav-right{display:flex;align-items:center;gap:10px}
+.pill{background:var(--s2);border:1px solid var(--border);border-radius:20px;
+  padding:4px 12px;font-size:.7rem;color:var(--muted);letter-spacing:.6px;text-transform:uppercase}
+.pill.live{border-color:#10d9a030;color:var(--green)}
+.pill.live::before{content:'● ';font-size:.6rem}
+
+/* HERO */
+.hero{position:relative;z-index:1;text-align:center;padding:56px 24px 40px}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;
+  background:rgba(111,78,242,.12);border:1px solid rgba(111,78,242,.3);
+  border-radius:20px;padding:5px 14px;font-size:.72rem;color:var(--a2);
+  margin-bottom:20px;font-weight:600}
+.hero h1{font-size:clamp(1.8rem,4vw,3rem);font-weight:900;letter-spacing:-1px;
+  line-height:1.15;margin-bottom:14px}
+.hero h1 span{
+  background:linear-gradient(135deg,var(--a2),var(--green));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{color:var(--muted);font-size:.9rem;max-width:520px;margin:0 auto 28px;line-height:1.7}
+.hero-actions{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+
+/* STEPPER */
+.stepper{position:relative;z-index:1;display:flex;align-items:center;
+  justify-content:center;gap:0;margin:0 auto 32px;
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:40px;padding:5px;width:fit-content}
+.st{display:flex;align-items:center;gap:7px;padding:8px 18px;border-radius:40px;
+  font-size:.78rem;font-weight:600;color:var(--muted);transition:all .3s}
+.st.active{background:var(--accent);color:#fff;box-shadow:0 0 20px rgba(111,78,242,.4)}
+.st.done{color:var(--green)}
+.st-n{width:17px;height:17px;border-radius:50%;background:var(--border);
+  display:grid;place-items:center;font-size:.65rem;transition:all .3s}
+.st.active .st-n{background:rgba(255,255,255,.2)}
+.st.done .st-n{background:var(--green);color:#000;font-weight:700}
+
+/* MAIN */
+.wrap{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:0 20px 80px}
+
+/* CARDS */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);
+  padding:24px;margin-bottom:18px;transition:border-color .3s}
+.card:hover{border-color:#2d3348}
+.ct{font-size:.68rem;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:18px;display:flex;align-items:center;gap:8px}
+.ct-bar{width:3px;height:13px;background:var(--accent);border-radius:2px;flex-shrink:0}
+
+/* UPLOAD */
+.drop{border:2px dashed var(--border);border-radius:10px;padding:48px 20px;
+  text-align:center;cursor:pointer;position:relative;background:var(--s2);
+  transition:all .25s}
+.drop:hover,.drop.drag{border-color:var(--accent);background:rgba(111,78,242,.06)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop-icon{width:52px;height:52px;margin:0 auto 14px;border-radius:14px;
+  background:linear-gradient(135deg,rgba(111,78,242,.2),rgba(168,85,247,.15));
+  border:1px solid rgba(111,78,242,.25);display:grid;place-items:center;font-size:1.5rem}
+.drop h3{font-size:.95rem;font-weight:700;margin-bottom:6px}
+.drop p{font-size:.8rem;color:var(--muted)}
+.drop p a{color:var(--a2);text-decoration:none;font-weight:600}
+.finfo{margin-top:14px;padding:9px 16px;background:rgba(16,217,160,.08);
+  border:1px solid rgba(16,217,160,.2);border-radius:8px;
+  color:var(--green);font-size:.8rem;font-weight:600;display:none}
+
+/* SAMPLE LINK */
+.sample-bar{display:flex;align-items:center;gap:8px;margin-top:12px;
+  padding:10px 14px;background:var(--s3);border:1px solid var(--border);
+  border-radius:8px;font-size:.78rem;color:var(--muted)}
+.sample-bar a{color:var(--a2);font-weight:600;text-decoration:none}
+.sample-bar a:hover{color:var(--a3)}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:600px){.g2{grid-template-columns:1fr}}
+
+.field label{display:block;font-size:.7rem;font-weight:700;color:var(--muted);
+  margin-bottom:5px;letter-spacing:.4px;text-transform:uppercase}
+.field input,.field select{width:100%;padding:9px 12px;
+  background:var(--s2);border:1px solid var(--border);border-radius:8px;
+  color:var(--text);font-size:.85rem;outline:none;font-family:inherit;
+  transition:border-color .2s,box-shadow .2s}
+.field input:focus,.field select:focus{
+  border-color:var(--accent);box-shadow:0 0 0 3px rgba(111,78,242,.15)}
+.field select option{background:var(--s2)}
+.field small{font-size:.7rem;color:var(--muted);margin-top:4px;display:block}
+.hint{margin-top:8px;padding:8px 11px;background:rgba(111,78,242,.08);
+  border:1px solid rgba(111,78,242,.2);border-radius:7px;
+  font-size:.75rem;color:var(--a2)}
+
+/* TOGGLE */
+.toggle-row{display:flex;align-items:center;gap:10px;margin-top:14px;
+  padding:12px 14px;background:var(--s2);border:1px solid var(--border);border-radius:8px}
+.toggle-label{font-size:.8rem;color:var(--muted);flex:1}
+.toggle-label strong{color:var(--text)}
+.toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:var(--border);border-radius:10px;
+  cursor:pointer;transition:background .2s}
+.slider::before{content:'';position:absolute;width:14px;height:14px;
+  left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s}
+.toggle input:checked+.slider{background:var(--accent)}
+.toggle input:checked+.slider::before{transform:translateX(16px)}
+
+/* BTNS */
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 20px;
+  border-radius:8px;border:none;font-size:.85rem;font-weight:600;
+  cursor:pointer;font-family:inherit;transition:all .2s}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-p{background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff;
+  box-shadow:0 4px 16px rgba(111,78,242,.3)}
+.btn-p:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 22px rgba(111,78,242,.45)}
+.btn-o{background:transparent;color:var(--text);border:1px solid var(--border)}
+.btn-o:hover:not(:disabled){border-color:var(--a2);color:var(--a2)}
+.btn-g{background:linear-gradient(135deg,#059669,var(--green));color:#000;font-weight:700;
+  box-shadow:0 4px 16px rgba(16,217,160,.25)}
+.btn-g:hover:not(:disabled){transform:translateY(-1px)}
+
+/* SPINNER */
+.spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.25);
+  border-top-color:#fff;border-radius:50%;animation:sp .65s linear infinite;display:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* PROGRESS */
+.prog-wrap{margin-top:14px;display:none}
+.prog-lbl{font-size:.72rem;color:var(--muted);margin-bottom:5px;display:flex;justify-content:space-between}
+.prog-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--green));
+  border-radius:2px;transition:width .35s ease}
+
+/* PREVIEW TABLE */
+.tbl-scroll{overflow-x:auto;border-radius:9px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+thead tr{background:var(--s2)}
+th{padding:9px 13px;text-align:left;font-weight:700;font-size:.68rem;
+  text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap}
+td{padding:8px 13px;border-top:1px solid var(--border);color:var(--text)}
+tbody tr:hover td{background:var(--s2)}
+
+/* STATS */
+.stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+@media(max-width:640px){.stats4{grid-template-columns:repeat(2,1fr)}}
+.sc{background:var(--s2);border:1px solid var(--border);border-radius:10px;
+  padding:18px 16px;text-align:center;position:relative;overflow:hidden}
+.sc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.sc.t::after{background:var(--accent)}
+.sc.v::after{background:var(--green)}
+.sc.i::after{background:var(--red)}
+.sc.q::after{background:var(--blue)}
+.sn{font-size:2rem;font-weight:900;line-height:1;margin-bottom:4px;font-variant-numeric:tabular-nums}
+.sc.t .sn{color:var(--a2)}.sc.v .sn{color:var(--green)}
+.sc.i .sn{color:var(--red)}.sc.q .sn{color:var(--blue)}
+.sl{font-size:.67rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+
+/* RESULTS GRID */
+.rg{display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:start}
+@media(max-width:600px){.rg{grid-template-columns:1fr}}
+
+.chart-box{background:var(--s2);border:1px solid var(--border);border-radius:10px;
+  padding:18px;text-align:center}
+.chart-box h5{font-size:.68rem;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--muted);margin-bottom:12px;font-weight:700}
+.qpct{font-size:.78rem;color:var(--muted);margin-top:10px}
+.qpct strong{color:var(--text);font-size:1.1rem}
+
+.breakdown{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.brow{display:flex;align-items:center;gap:8px;font-size:.73rem}
+.blbl{flex:1;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bbar{width:60px;height:5px;background:var(--border);border-radius:3px;overflow:hidden;flex-shrink:0}
+.bfill{height:100%;background:var(--red);border-radius:3px}
+.bcnt{color:var(--red);font-weight:700;min-width:22px;text-align:right;font-size:.72rem}
+
+/* ERROR TABLE */
+.etbl{overflow-x:auto;max-height:300px;overflow-y:auto;border-radius:9px;border:1px solid rgba(255,77,109,.2)}
+.etbl table thead th{background:rgba(255,77,109,.08);color:var(--red)}
+.erow td:first-child{color:var(--yellow);font-weight:700;font-variant-numeric:tabular-nums}
+.ebadge{display:inline-block;background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.25);
+  color:#fca5a5;border-radius:5px;padding:2px 7px;font-size:.69rem;margin:1px 2px;white-space:nowrap}
+
+/* TAGS */
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.tag{background:rgba(111,78,242,.1);border:1px solid rgba(111,78,242,.25);
+  color:var(--a2);border-radius:5px;padding:2px 8px;font-size:.69rem;font-weight:500}
+
+/* DL BANNER */
+.dl{background:linear-gradient(135deg,rgba(16,217,160,.06),rgba(5,150,105,.08));
+  border:1px solid rgba(16,217,160,.2);border-radius:10px;
+  padding:16px 20px;display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
+.dl-ico{font-size:1.6rem}
+.dl-txt h4{font-size:.88rem;font-weight:700;color:var(--green)}
+.dl-txt p{font-size:.74rem;color:#5a9a7a;margin-top:2px}
+
+/* FOOTER */
+footer{position:relative;z-index:1;text-align:center;padding:20px;
+  font-size:.72rem;color:var(--muted);border-top:1px solid var(--border)}
+
+.hidden{display:none!important}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--s1)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="brand">
+    <div class="logo">X</div>
+    <div class="brand-name">Xeno <em>Validator</em></div>
+  </div>
+  <div class="nav-right">
+    <span class="pill live">Live</span>
+    <span class="pill">Transaction Data · v2.0</span>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>Validate Transaction Data<br><span>Before It Breaks Your Pipeline</span></h1>
+  <p>Upload any transaction CSV — orders, products, payments. Get instant validation with country-specific phone rules, date format checks, and a clean downloadable output.</p>
+  <div class="hero-actions">
+    <button class="btn btn-p" onclick="document.getElementById('fileInput').click()">↑ Upload CSV</button>
+    <a href="/sample" class="btn btn-o">↓ Download Sample CSV</a>
+  </div>
+</div>
+
+<!-- STEPPER -->
+<div class="stepper" id="stepper">
+  <div class="st active" id="st1"><div class="st-n">1</div> Upload</div>
+  <div class="st" id="st2"><div class="st-n">2</div> Configure</div>
+  <div class="st" id="st3"><div class="st-n">3</div> Results</div>
+</div>
+
+<div class="wrap">
+
+  <!-- UPLOAD CARD -->
+  <div class="card">
+    <div class="ct"><div class="ct-bar"></div>Upload Dataset</div>
+    <div class="drop" id="dropZone">
+      <input type="file" id="fileInput" accept=".csv"/>
+      <div class="drop-icon">📂</div>
+      <h3>Drop your CSV here</h3>
+      <p>or <a onclick="document.getElementById('fileInput').click()">click to browse</a> &nbsp;·&nbsp; order / product / payment data</p>
+      <div class="finfo" id="finfo"></div>
+    </div>
+    <div class="sample-bar">
+      💡 First time? &nbsp;<a href="/sample">Download sample_transactions.csv</a>&nbsp; to see the expected format.
+    </div>
+  </div>
+
+  <!-- CONFIG CARD -->
+  <div class="card">
+    <div class="ct"><div class="ct-bar"></div>Validation Settings</div>
+    <div class="g2">
+      <div class="field">
+        <label>Country (Phone Rules)</label>
+        <select id="countryCode">
+          <option value="IN">🇮🇳 India — 10 digits (6–9)</option>
+          <option value="SG">🇸🇬 Singapore — 8 digits (8/9)</option>
+          <option value="US">🇺🇸 USA — 10 digits</option>
+          <option value="GB">🇬🇧 UK — 10 digits</option>
+          <option value="AE">🇦🇪 UAE — 9 digits (5)</option>
+          <option value="AU">🇦🇺 Australia — 9 digits (4/5)</option>
+          <option value="MY">🇲🇾 Malaysia — 9 digits (1)</option>
+        </select>
+        <div class="hint" id="countryHint">India: 10-digit numbers starting with 6–9</div>
+      </div>
+      <div class="field">
+        <label>Phone Columns <small style="display:inline;text-transform:none">(comma-sep)</small></label>
+        <input type="text" id="phoneCols" placeholder="Auto-detected · e.g. phone_number, mobile"/>
+        <small>Leave blank to auto-detect</small>
+      </div>
+      <div class="field">
+        <label>Date / Time Columns <small style="display:inline;text-transform:none">(comma-sep)</small></label>
+        <input type="text" id="dateCols" placeholder="Auto-detected · e.g. order_date"/>
+        <small>Supports DD-MM-YYYY, YYYY-MM-DD, MM/DD/YYYY and more</small>
+      </div>
+      <div class="field">
+        <label>Required Columns <small style="display:inline;text-transform:none">(comma-sep)</small></label>
+        <input type="text" id="reqCols" placeholder="Auto-detected · e.g. order_id, product_id"/>
+        <small>Rows with empty values here will be flagged</small>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-label"><strong>Strict Mode</strong> — also flag negative amounts &amp; extra integrity checks</div>
+      <label class="toggle"><input type="checkbox" id="strictMode"/><span class="slider"></span></label>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-o" id="previewBtn" onclick="previewFile()" disabled>👁 Preview</button>
+      <button class="btn btn-p" id="validateBtn" onclick="runValidation()" disabled>
+        <div class="spin" id="spin"></div>⚡ Validate &amp; Download
+      </button>
+    </div>
+    <div class="prog-wrap" id="progWrap">
+      <div class="prog-lbl"><span id="progLbl">Scanning…</span><span id="progPct">0%</span></div>
+      <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+    </div>
+  </div>
+
+  <!-- PREVIEW CARD -->
+  <div class="card hidden" id="previewCard">
+    <div class="ct"><div class="ct-bar"></div>Data Preview <span id="prevMeta" style="font-weight:400;color:var(--muted);margin-left:6px;font-size:.75rem;text-transform:none;letter-spacing:0"></span></div>
+    <div class="tags" id="colTags" style="margin-bottom:12px"></div>
+    <div class="tbl-scroll" id="prevTbl"></div>
+  </div>
+
+  <!-- RESULTS CARD -->
+  <div class="card hidden" id="resultsCard">
+    <div class="ct"><div class="ct-bar"></div>Validation Report</div>
+
+    <div class="stats4">
+      <div class="sc t"><div class="sn" id="rTotal">—</div><div class="sl">Total Rows</div></div>
+      <div class="sc v"><div class="sn" id="rValid">—</div><div class="sl">✓ Valid</div></div>
+      <div class="sc i"><div class="sn" id="rInvalid">—</div><div class="sl">✗ Issues</div></div>
+      <div class="sc q"><div class="sn" id="rQual">—</div><div class="sl">Quality %</div></div>
+    </div>
+
+    <div class="rg">
+      <div>
+        <div class="chart-box">
+          <h5>Data Quality</h5>
+          <canvas id="donut" width="160" height="160"></canvas>
+          <div class="qpct"><strong id="qpctNum">—</strong>% clean</div>
+        </div>
+        <div class="breakdown" id="breakdown"></div>
+      </div>
+      <div>
+        <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:700;margin-bottom:8px">
+          ⚠ Flagged Rows <span id="errCnt" style="color:var(--red)"></span>
+        </div>
+        <div class="etbl">
+          <table>
+            <thead><tr><th>Row #</th><th>Issues Found</th></tr></thead>
+            <tbody id="errBody"></tbody>
+          </table>
+        </div>
+        <div class="hidden" id="truncNote" style="font-size:.7rem;color:var(--red);margin-top:6px;font-style:italic">
+          Showing first 60 flagged rows. Full report is inside the downloaded ZIP.
+        </div>
+      </div>
+    </div>
+
+    <div class="dl">
+      <div class="dl-ico">📦</div>
+      <div class="dl-txt">
+        <h4>xeno_validated_output.zip is downloading…</h4>
+        <p>Contains cleaned CSV (chunked at 500 rows if large) + validation_summary.json</p>
+      </div>
+      <button class="btn btn-g" style="margin-left:auto" onclick="dlAgain()">↓ Download Again</button>
+    </div>
+
+    <div style="margin-top:14px;font-size:.74rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:10px">
+      <span>Country: <span class="tag" id="rCountry"></span></span>
+      <span>Phone cols: <span id="rPhone"></span></span>
+      <span>Date cols: <span id="rDate"></span></span>
+      <span>Chunks: <span class="tag" id="rChunks"></span></span>
+    </div>
+  </div>
+
+</div>
+
+<footer>Built for Xeno Pvt. Ltd. · Transaction Data Validator · 2025</footer>
+
+<script>
+const HINTS={
+  IN:'India: 10-digit, starts with 6–9',
+  SG:'Singapore: 8-digit, starts with 8 or 9',
+  US:'USA: 10-digit, any prefix',
+  GB:'UK: 10-digit, any prefix',
+  AE:'UAE: 9-digit, starts with 5',
+  AU:'Australia: 9-digit, starts with 4 or 5',
+  MY:'Malaysia: 9-digit, starts with 1'
+};
+
+document.getElementById('countryCode').addEventListener('change',function(){
+  document.getElementById('countryHint').textContent=HINTS[this.value]||'';
+});
+
+let lastFile=null, lastBlob=null, chart=null;
+const dz=document.getElementById('dropZone');
+const fi=document.getElementById('fileInput');
+
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{
+  e.preventDefault();dz.classList.remove('drag');
+  if(e.dataTransfer.files[0]){fi.files=e.dataTransfer.files;onFile(e.dataTransfer.files[0]);}
+});
+fi.addEventListener('change',()=>{if(fi.files[0])onFile(fi.files[0])});
+
+function onFile(f){
+  lastFile=f;
+  const el=document.getElementById('finfo');
+  el.textContent=`✓  ${f.name}   ·   ${(f.size/1024).toFixed(1)} KB`;
+  el.style.display='block';
+  document.getElementById('previewBtn').disabled=false;
+  document.getElementById('validateBtn').disabled=false;
+  document.getElementById('resultsCard').classList.add('hidden');
+  document.getElementById('previewCard').classList.add('hidden');
+  setStep(2);
+}
+
+function setStep(n){
+  [1,2,3].forEach(i=>{
+    const el=document.getElementById('st'+i);
+    el.classList.remove('active','done');
+    const nn=el.querySelector('.st-n');
+    if(i<n){el.classList.add('done');nn.textContent='✓';}
+    else if(i===n){el.classList.add('active');nn.textContent=i;}
+    else nn.textContent=i;
+  });
+}
+
+function getFormData(){
+  const fd=new FormData();
+  fd.append('file',lastFile);
+  fd.append('country_code',document.getElementById('countryCode').value);
+  fd.append('phone_cols',document.getElementById('phoneCols').value);
+  fd.append('date_cols',document.getElementById('dateCols').value);
+  fd.append('required_cols',document.getElementById('reqCols').value);
+  fd.append('strict_mode',document.getElementById('strictMode').checked?'true':'false');
+  return fd;
+}
+
+async function previewFile(){
+  if(!lastFile)return;
+  const fd=new FormData();fd.append('file',lastFile);
+  const res=await fetch('/preview',{method:'POST',body:fd});
+  const d=await res.json();
+  if(d.error){alert(d.error);return;}
+  document.getElementById('prevMeta').textContent=`${d.row_count} rows · ${d.columns.length} columns`;
+  document.getElementById('colTags').innerHTML=d.columns.map(c=>`<span class="tag">${c}</span>`).join('');
+  const cols=d.columns;
+  let h=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+  d.sample.forEach(r=>{h+=`<tr>${cols.map(c=>`<td>${r[c]??''}</td>`).join('')}</tr>`;});
+  h+='</tbody></table>';
+  document.getElementById('prevTbl').innerHTML=h;
+  document.getElementById('previewCard').classList.remove('hidden');
+}
+
+async function runValidation(){
+  if(!lastFile){alert('Please upload a CSV first.');return;}
+  const btn=document.getElementById('validateBtn');
+  const sp=document.getElementById('spin');
+  const pw=document.getElementById('progWrap');
+  const pf=document.getElementById('progFill');
+  const pl=document.getElementById('progLbl');
+  const pp=document.getElementById('progPct');
+
+  btn.disabled=true;sp.style.display='inline-block';pw.style.display='block';
+
+  let pct=0;
+  const msgs=['Reading CSV…','Parsing columns…','Validating phone numbers…','Checking dates…','Verifying amounts…','Generating report…'];
+  let mi=0;
+  const tick=setInterval(()=>{
+    pct=Math.min(pct+Math.random()*10,88);
+    pf.style.width=pct+'%';pp.textContent=Math.round(pct)+'%';
+    if(Math.round(pct)%(100/msgs.length)<10)pl.textContent=msgs[Math.min(mi++,msgs.length-1)];
+  },180);
+
+  try{
+    // Stats
+    const statsRes=await fetch('/validate-json',{method:'POST',body:getFormData()});
+    const stats=await statsRes.json();
+    if(stats.error){alert(stats.error);return;}
+
+    clearInterval(tick);pf.style.width='100%';pp.textContent='100%';pl.textContent='Done ✓';
+
+    showResults(stats);
+
+    // Download
+    const dlRes=await fetch('/validate',{method:'POST',body:getFormData()});
+    lastBlob=await dlRes.blob();
+    triggerDl(lastBlob);
+
+  }catch(e){clearInterval(tick);alert('Error: '+e.message);}
+  finally{
+    btn.disabled=false;sp.style.display='none';
+    setTimeout(()=>{pw.style.display='none';pf.style.width='0';pp.textContent='0%';},2000);
+  }
+}
+
+function triggerDl(blob){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='xeno_validated_output.zip';a.click();
+  URL.revokeObjectURL(url);
+}
+function dlAgain(){if(lastBlob)triggerDl(lastBlob);}
+
+function animN(el,target){
+  const isFloat=String(target).includes('.');
+  let cur=0,step=Math.max(0.1,target/40);
+  const t=setInterval(()=>{
+    cur=Math.min(cur+step,target);
+    el.textContent=isFloat?cur.toFixed(1):Math.round(cur).toLocaleString();
+    if(cur>=target)clearInterval(t);
+  },28);
+}
+
+function showResults(s){
+  setStep(3);
+  document.getElementById('resultsCard').classList.remove('hidden');
+  document.getElementById('resultsCard').scrollIntoView({behavior:'smooth',block:'start'});
+
+  animN(document.getElementById('rTotal'),s.total);
+  animN(document.getElementById('rValid'),s.valid);
+  animN(document.getElementById('rInvalid'),s.invalid);
+  animN(document.getElementById('rQual'),s.quality_pct);
+  animN(document.getElementById('qpctNum'),s.quality_pct);
+
+  if(chart)chart.destroy();
+  chart=new Chart(document.getElementById('donut'),{
+    type:'doughnut',
+    data:{labels:['Valid','Invalid'],
+      datasets:[{data:[s.valid,s.invalid],
+        backgroundColor:['#10d9a0','#ff4d6d'],borderWidth:0,hoverOffset:3}]},
+    options:{cutout:'74%',plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw}`}}},
+      animation:{duration:800}}
+  });
+
+  // Breakdown
+  const bk=document.getElementById('breakdown');bk.innerHTML='';
+  const etc=s.error_type_counts||{};
+  const maxV=Math.max(...Object.values(etc),1);
+  Object.entries(etc).sort((a,b)=>b[1]-a[1]).slice(0,6).forEach(([k,v])=>{
+    bk.innerHTML+=`<div class="brow">
+      <div class="blbl">${k}</div>
+      <div class="bbar"><div class="bfill" style="width:${Math.round(v/maxV*100)}%"></div></div>
+      <div class="bcnt">${v}</div></div>`;
+  });
+
+  // Error table
+  const tb=document.getElementById('errBody');tb.innerHTML='';
+  document.getElementById('errCnt').textContent=s.invalid?`(${s.invalid} rows)`:'';
+  if(s.errors_preview&&s.errors_preview.length){
+    s.errors_preview.forEach(e=>{
+      tb.innerHTML+=`<tr class="erow"><td>${e.row}</td><td>${e.issues.map(i=>`<span class="ebadge">${i}</span>`).join('')}</td></tr>`;
+    });
+    if(s.errors_truncated)document.getElementById('truncNote').classList.remove('hidden');
+  }else{
+    tb.innerHTML=`<tr><td colspan="2" style="color:var(--green);padding:16px;text-align:center;font-weight:600">🎉 All rows passed validation!</td></tr>`;
+  }
+
+  document.getElementById('rCountry').textContent=s.country;
+  document.getElementById('rPhone').innerHTML=(s.phone_cols||[]).map(c=>`<span class="tag">${c}</span>`).join(' ')||'<span style="color:var(--muted)">none</span>';
+  document.getElementById('rDate').innerHTML=(s.date_cols||[]).map(c=>`<span class="tag">${c}</span>`).join(' ')||'<span style="color:var(--muted)">none</span>';
+  document.getElementById('rChunks').textContent=s.chunks||1;
+}
+</script>
+</body>
+</html>
