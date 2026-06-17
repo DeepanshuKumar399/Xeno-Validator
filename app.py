@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, send_file, render_template, Response
+from werkzeug.utils import secure_filename
 import pandas as pd
 import re, io, zipfile, json
 from datetime import datetime
@@ -213,8 +214,8 @@ def sample():
 @app.route("/preview", methods=["POST"])
 def preview():
     file = request.files.get("file")
-    if not file:
-        return jsonify({"error": "No file uploaded"}), 400
+    if not file or not secure_filename(file.filename).endswith(".csv"):
+        return jsonify({"error": "No valid CSV file uploaded"}), 400
     try:
         df = pd.read_csv(file)
         df = norm_cols(df)
@@ -230,8 +231,8 @@ def preview():
 @app.route("/validate-json", methods=["POST"])
 def validate_json():
     file = request.files.get("file")
-    if not file:
-        return jsonify({"error": "No file uploaded"}), 400
+    if not file or not secure_filename(file.filename).endswith(".csv"):
+        return jsonify({"error": "No valid CSV file uploaded"}), 400
     try:
         df = pd.read_csv(file)
     except Exception as e:
@@ -282,8 +283,8 @@ def validate_json():
 @app.route("/validate", methods=["POST"])
 def validate():
     file = request.files.get("file")
-    if not file:
-        return jsonify({"error": "No file uploaded"}), 400
+    if not file or not secure_filename(file.filename).endswith(".csv"):
+        return jsonify({"error": "No valid CSV file uploaded"}), 400
     try:
         df = pd.read_csv(file)
     except Exception as e:
@@ -330,4 +331,5 @@ def validate():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    import os
+    app.run(debug=os.environ.get("FLASK_DEBUG", "false").lower() == "true")
